@@ -12,8 +12,6 @@ constexpr std::string_view NAME_LABEL_FILE = "labelmap.txt"; // Tag file
 constexpr std::string_view NAME_DEPLOY_FILE = "MobileNetSSD_deploy.prototxt"; // Description file
 constexpr std::string_view NAME_MODEL_FILE = "MobileNetSSD_deploy.caffemodel"; // Training files
 
-constexpr std::string_view OUTPUT_NAME_FILE = "output.avi";
-
 constexpr int WIDTH = 500;
 constexpr int HEIGHT = 500;
 constexpr int DELAY_MS = 10;
@@ -38,11 +36,16 @@ void getLabelsFromFile(std::vector<std::string>& labels, const std::string& name
 
 int main(int argc, char* argv[])
 {
-    std::string file;
+    std::string inputFile;
+    std::string outputFile;
+    bool isCuda;
     boost::program_options::options_description desc("Options");
     desc.add_options()
         // All options:
-        ("file,f", boost::program_options::value<std::string>(&file)->default_value(""), "Path to video file.\n")("help,h", "Produce help message."); // Help
+        ("in,i", boost::program_options::value<std::string>(&inputFile)->default_value(""), "Path to input file.\n") //
+        ("out,o", boost::program_options::value<std::string>(&outputFile)->default_value("output.avi"), "Path to output file.\n") //
+        ("cuda,c", boost::program_options::value<bool>(&isCuda)->default_value(true), "Set CUDA Enable.\n") //
+        ("help,h", "Produce help message."); // Help
     boost::program_options::variables_map options;
     try {
         boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), options);
@@ -57,11 +60,11 @@ int main(int argc, char* argv[])
     }
 
     cv::VideoCapture capture;
-    if (file.length() == 0) {
+    if (inputFile.length() == 0) {
         // Open default video camera
         capture.open(cv::VideoCaptureAPIs::CAP_ANY);
     } else {
-        capture.open(file);
+        capture.open(inputFile);
     }
     if (capture.isOpened() == false) {
         std::cerr << "Cannot open video!" << std::endl;
@@ -84,13 +87,15 @@ int main(int argc, char* argv[])
     }
 
     // Define codec and create VideoWriter object.output is stored in 'outcpp.avi' file
-    cv::VideoWriter video(OUTPUT_NAME_FILE.data(), cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), fps, cv::Size(WIDTH, HEIGHT));
+    cv::VideoWriter video(outputFile, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), fps, cv::Size(WIDTH, HEIGHT));
 
-    cv::cuda::DeviceInfo deviceInfo;
     bool isCudaEnable = false;
-    if (cv::cuda::getCudaEnabledDeviceCount() == 1 && deviceInfo.isCompatible() == 1) {
-        cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
-        isCudaEnable = true;
+    if (cv::cuda::getCudaEnabledDeviceCount() != 0) {
+        cv::cuda::DeviceInfo deviceInfo;
+        if (deviceInfo.isCompatible() != 0 && isCuda) {
+            cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
+            isCudaEnable = true;
+        }
     }
 
     static constexpr int ESCAPE_KEY = 27;
@@ -144,7 +149,7 @@ int main(int argc, char* argv[])
                 const float br_x = result.at<float>(i, 5) * source.cols;
                 const float br_y = result.at<float>(i, 6) * source.rows;
 
-                const cv::Rect objrect((int)tl_x, (int)tl_y, int(br_x - tl_x), int(br_y - tl_y));
+                const cv::Rect objrect(static_cast<int>(tl_x), static_cast<int>(tl_y), static_cast<int>(br_x - tl_x), static_cast<int>(br_y - tl_y));
                 cv::rectangle(source, objrect, cv::Scalar(0, 0, 255), 1, 8, 0);
                 cv::putText(source, labels[index], cv::Point(tl_x, tl_y), cv::FONT_HERSHEY_COMPLEX_SMALL, 1.0, cv::Scalar(255, 0, 0), 1, 5);
             }
