@@ -32,3 +32,8 @@ clang:
       -DCMAKE_BUILD_TYPE=Release
       ..
     - cmake --build .
+
+ubuntu-20.04:
+  stage: docker
+  script:
+    - docker build -t mobile_net_ssd:latest .
